@@ -16,17 +16,15 @@
 // VGA timing constants
 #define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE   479    // (active - 1)
-#define RGB_ACTIVE 319    // (horizontal active)/2 - 1
-// #define RGB_ACTIVE 639 // change to this if 1 pixel/byte
+#define RGB_ACTIVE 159    // number of bytes sent per line - 1
 
-// Length of the pixel array, and number of DMA transfers
-#define TXCOUNT 153600 // Total pixels/2 (since we have 2 pixels per byte)
+// Length of the pixel array
+#define TXCOUNT 38400 // Total internal pixels/2 (since we have 2 pixels per byte)
 
 // Pixel color array that is DMA's to the PIO machines and
 // a pointer to the ADDRESS of this color array.
 // Note that this array is automatically initialized to all 0's (black)
 unsigned char vga_data_array[TXCOUNT];
-char * address_pointer = &vga_data_array[0] ;
 
 // Bit masks for drawPixel routine
 #define TOPMASK 0b11000111
@@ -45,9 +43,25 @@ char * address_pointer = &vga_data_array[0] ;
 unsigned short cursor_y, cursor_x, textsize ;
 char textcolor, textbgcolor, wrap;
 
-// Screen width/height
-#define _width 640
-#define _height 480
+// (internal) Screen width/height
+#define _width 320
+#define _height 240
+
+// DMA channel that sends color data to the rgb pio state machine
+int rgb_chan;
+// DMA channel that reconfigures and restarts rgb_chan
+int reconf_chan;
+
+/// @brief Pointers into vga_data_array that point to lines. There are two consecutive pointers per line.
+uint8_t *line_ptrs[481];
+
+/// @brief A handler for DMA_IRQ_0. Indicates that a full frame has been written to pio and the dma channels must be restarted to draw the next frame.
+static void null_trigger_irq(void) {
+  dma_channel_acknowledge_irq0(rgb_chan);
+  irq_clear(DMA_IRQ_0);
+
+  dma_channel_set_read_addr(reconf_chan, line_ptrs, true);
+}
 
 void initVGA() {
         // Choose which PIO instance to use (there are two instances, each with 4 state machines)
@@ -85,41 +99,50 @@ void initVGA() {
     // ============================== PIO DMA Channels =================================================
     /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // DMA channels - 0 sends color data, 1 reconfigures and restarts 0
-    int rgb_chan_0 = 0;
-    int rgb_chan_1 = 1;
+    // Generate two pointers to every line in vga_data_array to be used as dma control blocks
+    const int stop = count_of(line_ptrs) - 1; // - 1 cause last one is for null trigger
+    for (int i = 0; i < stop; i++)
+      line_ptrs[i] = vga_data_array + ((i/2) * 160); // 160 = bytes per line. i/2 to print every line twice.
+    line_ptrs[stop] = 0; // initialize null trigger
+
+    // Claim two channels
+    rgb_chan = dma_claim_unused_channel(true);
+    reconf_chan = dma_claim_unused_channel(true);
 
     // Channel Zero (sends color data to PIO VGA machine)
-    dma_channel_config c0 = dma_channel_get_default_config(rgb_chan_0);  // default configs
+    dma_channel_config c0 = dma_channel_get_default_config(rgb_chan);    // default configs
     channel_config_set_transfer_data_size(&c0, DMA_SIZE_8);              // 8-bit txfers
     channel_config_set_read_increment(&c0, true);                        // yes read incrementing
     channel_config_set_write_increment(&c0, false);                      // no write incrementing
     channel_config_set_dreq(&c0, DREQ_PIO0_TX2) ;                        // DREQ_PIO0_TX2 pacing (FIFO)
-    channel_config_set_chain_to(&c0, rgb_chan_1);                        // chain to other channel
+    channel_config_set_chain_to(&c0, reconf_chan);                       // chain to other channel
+    channel_config_set_irq_quiet(&c0, true);                             // cause irq on null trigger
+    dma_channel_set_irq0_enabled(rgb_chan, true);                        // enable DMA_IRQ_0 and have this channel's irq trigger it
+    irq_set_exclusive_handler(DMA_IRQ_0, null_trigger_irq);              // Set a handler to be called on interrupt
+    irq_set_enabled(DMA_IRQ_0, true);                                    // Enable interrupts for DMA_IRQ_0
 
     dma_channel_configure(
-        rgb_chan_0,                 // Channel to be configured
+        rgb_chan,                   // Channel to be configured
         &c0,                        // The configuration we just created
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
         &vga_data_array,            // The initial read address (pixel color array)
-        TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
+        160,                        // Number of transfers (number of bytes in a line)
         false                       // Don't start immediately.
     );
 
     // Channel One (reconfigures the first channel)
-    dma_channel_config c1 = dma_channel_get_default_config(rgb_chan_1);   // default configs
-    channel_config_set_transfer_data_size(&c1, DMA_SIZE_32);              // 32-bit txfers
-    channel_config_set_read_increment(&c1, false);                        // no read incrementing
-    channel_config_set_write_increment(&c1, false);                       // no write incrementing
-    channel_config_set_chain_to(&c1, rgb_chan_0);                         // chain to other channel
+    c0 = dma_channel_get_default_config(reconf_chan);        // default configs
+    channel_config_set_transfer_data_size(&c0, DMA_SIZE_32); // 32-bit txfers
+    channel_config_set_read_increment(&c0, true);            // yes read incrementing
+    channel_config_set_write_increment(&c0, false);          // no write incrementing
 
     dma_channel_configure(
-        rgb_chan_1,                         // Channel to be configured
-        &c1,                                // The configuration we just created
-        &dma_hw->ch[rgb_chan_0].read_addr,  // Write address (channel 0 read address)
-        &address_pointer,                   // Read address (POINTER TO AN ADDRESS)
-        1,                                  // Number of transfers, in this case each is 4 byte
-        false                               // Don't start immediately.
+        reconf_chan,                              // Channel to be configured
+        &c0,                      // The configuration we just created
+        &dma_hw->ch[rgb_chan].al3_read_addr_trig, // Write address (channel 0 read address)
+        line_ptrs,                                // Read address (POINTER TO AN ADDRESS)
+        1,                                        // Number of transfers, in this case each is 4 byte
+        false                                     // Don't start immediately.
     );
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,20 +155,18 @@ void initVGA() {
     pio_sm_put_blocking(pio, vsync_sm, V_ACTIVE);
     pio_sm_put_blocking(pio, rgb_sm, RGB_ACTIVE);
 
-
     // Start the two pio machine IN SYNC
     // Note that the RGB state machine is running at full speed,
     // so synchronization doesn't matter for that one. But, we'll
     // start them all simultaneously anyway.
     pio_enable_sm_mask_in_sync(pio, ((1u << hsync_sm) | (1u << vsync_sm) | (1u << rgb_sm)));
 
-    // Start DMA channel 0. Once started, the contents of the pixel color array
+    // Start DMA channel 1. Once started it will configure and start channel 0 and once channel 0 is started the contents of the pixel color array
     // will be continously DMA's to the PIO machines that are driving the screen.
     // To change the contents of the screen, we need only change the contents
     // of that array.
-    dma_start_channel_mask((1u << rgb_chan_0)) ;
+    dma_start_channel_mask((1u << reconf_chan));
 }
-
 
 // A function for drawing a pixel with a specified color.
 // Note that because information is passed to the PIO state machines through
@@ -153,13 +174,13 @@ void initVGA() {
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, char color) {
     // Range checks (640x480 display)
-    if (x > 639) x = 639 ;
+    if (x > _width-1) x = _width-1;
     if (x < 0) x = 0 ;
     if (y < 0) y = 0 ;
-    if (y > 479) y = 479 ;
+    if (y > _height-1) y = _height-1 ;
 
     // Which pixel is it?
-    int pixel = ((640 * y) + x) ;
+    int pixel = ((_width * y) + x) ;
 
     // Is this pixel stored in the first 3 bits
     // of the vga data array index, or the second
