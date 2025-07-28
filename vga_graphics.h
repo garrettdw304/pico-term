@@ -28,6 +28,29 @@ enum vga_pins {HSYNC=16, VSYNC, RED_PIN, GREEN_PIN, BLUE_PIN};
 // We can only produce 8 (3-bit) colors, so let's give them readable names - usable in main()
 enum colors {BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE};
 
+/// @brief The number of pixel bytes in a single line.
+#define LINE_BYTES 160
+
+/// @brief The number of pixel bytes in a single terminal row.
+#define ROW_BYTES (LINE_BYTES * 8)
+
+// VGA timing constants
+#define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
+#define V_ACTIVE   479    // (active - 1)
+#define RGB_ACTIVE (LINE_BYTES - 1)    // number of bytes sent per line - 1
+
+// (internal) Screen width/height
+#define WIDTH 320
+#define HEIGHT 240
+
+// Length of the pixel array
+#define TXCOUNT (WIDTH * HEIGHT / 2) // Total internal pixels/2 (since we have 2 pixels per byte)
+
+// Pixel color array that is DMA's to the PIO machines and
+// a pointer to the ADDRESS of this color array.
+// Note that this array is automatically initialized to all 0's (black)
+extern unsigned char vga_data_array[];
+
 // VGA primitives - usable in main
 void initVGA(void);
 void drawPixel(short x, short y, char color);

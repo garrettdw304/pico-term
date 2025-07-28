@@ -13,17 +13,6 @@
 // Font file
 #include "glcdfont.c"
 
-// VGA timing constants
-#define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
-#define V_ACTIVE   479    // (active - 1)
-#define RGB_ACTIVE 159    // number of bytes sent per line - 1
-
-// Length of the pixel array
-#define TXCOUNT 38400 // Total internal pixels/2 (since we have 2 pixels per byte)
-
-// Pixel color array that is DMA's to the PIO machines and
-// a pointer to the ADDRESS of this color array.
-// Note that this array is automatically initialized to all 0's (black)
 unsigned char vga_data_array[TXCOUNT];
 
 // Bit masks for drawPixel routine
@@ -42,10 +31,6 @@ unsigned char vga_data_array[TXCOUNT];
 // For drawing characters
 unsigned short cursor_y, cursor_x, textsize;
 char textcolor, textbgcolor, wrap;
-
-// (internal) Screen width/height
-#define _width 320
-#define _height 240
 
 // DMA channel that sends color data to the rgb pio state machine
 int rgb_chan;
@@ -102,7 +87,7 @@ void initVGA() {
     // Generate two pointers to every line in vga_data_array to be used as dma control blocks
     const int stop = count_of(line_ptrs) - 1; // - 1 cause last one is for null trigger
     for (int i = 0; i < stop; i++)
-        line_ptrs[i] = vga_data_array + ((i/2) * 160); // 160 = bytes per line. i/2 to print every line twice.
+        line_ptrs[i] = vga_data_array + ((i/2) * LINE_BYTES); // 160 = bytes per line. i/2 to print every line twice.
     line_ptrs[stop] = 0; // initialize null trigger
 
     // Claim two channels
@@ -126,7 +111,7 @@ void initVGA() {
         &c0,                        // The configuration we just created
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
         &vga_data_array,            // The initial read address (pixel color array)
-        160,                        // Number of transfers (number of bytes in a line)
+        LINE_BYTES,                        // Number of transfers (number of bytes in a line)
         false                       // Don't start immediately.
     );
 
@@ -174,13 +159,13 @@ void initVGA() {
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, char color) {
     // Range checks (640x480 display)
-    if (x > _width-1) x = _width-1;
+    if (x > WIDTH-1) x = WIDTH-1;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (y > _height-1) y = _height-1;
+    if (y > HEIGHT-1) y = HEIGHT-1;
 
     // Which pixel is it?
-    int pixel = ((_width * y) + x);
+    int pixel = ((WIDTH * y) + x);
 
     // Is this pixel stored in the first 3 bits
     // of the vga data array index, or the second
@@ -462,8 +447,8 @@ void fillRect(short x, short y, short w, short h, char color) {
 // Draw a character
 void drawChar(short x, short y, unsigned char c, char color, char bg, unsigned char size) {
     char i, j;
-    if  ((x >= _width)           || // Clip right
-        (y >= _height)           || // Clip bottom
+    if  ((x >= WIDTH)           || // Clip right
+        (y >= HEIGHT)           || // Clip bottom
         ((x + 6 * size - 1) < 0) || // Clip left
         ((y + 8 * size - 1) < 0))   // Clip top
         return;
@@ -490,7 +475,6 @@ void drawChar(short x, short y, unsigned char c, char color, char bg, unsigned c
         }
   }
 }
-
 
 inline void setCursor(short x, short y) {
 /* Set cursor for text to be printed
@@ -532,7 +516,6 @@ inline void setTextWrap(char w) {
   wrap = w;
 }
 
-
 void tft_write(unsigned char c) {
     if (c == '\n') {
         cursor_y += textsize*8;
@@ -541,12 +524,12 @@ void tft_write(unsigned char c) {
         // skip em
     } else if (c == '\t'){
         int new_x = cursor_x + tabspace;
-        if (new_x < _width)
+        if (new_x < WIDTH)
             cursor_x = new_x;
     } else {
         drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
         cursor_x += textsize*6;
-        if (wrap && (cursor_x > (_width - textsize*6))) {
+        if (wrap && (cursor_x > (WIDTH - textsize*6))) {
             cursor_y += textsize*8;
             cursor_x = 0;
         }

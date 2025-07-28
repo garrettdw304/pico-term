@@ -24,25 +24,20 @@
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/dma.h"
+#include "term.h"
 
 int main() {
-
     // Initialize stdio
     stdio_init_all();
 
     // Initialize the VGA screen
-    initVGA() ;
+    initVGA();
 
-    // Draw some filled rectangles
-    fillRect(0, 0, 176, 50, BLUE); // blue box
-    fillRect(0, 50, 176, 50, RED); // red box
-    fillRect(0, 100, 176, 50, GREEN); // green box
+    term_init();
 
-    // Write some text
-    setTextColor(WHITE);
-    setCursor(50, 50);
-    setTextSize(1);
-    writeString("HELLO WORLD!");
+    char *str = "Hello, world!";
+    while (*str != '\0')
+        term_process(*str++);
 
     while (true) tight_loop_contents();
 }
