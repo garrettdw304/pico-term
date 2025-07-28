@@ -40,7 +40,7 @@ unsigned char vga_data_array[TXCOUNT];
 #define pgm_read_byte(addr) (*(const unsigned char *)(addr))
 
 // For drawing characters
-unsigned short cursor_y, cursor_x, textsize ;
+unsigned short cursor_y, cursor_x, textsize;
 char textcolor, textbgcolor, wrap;
 
 // (internal) Screen width/height
@@ -57,14 +57,14 @@ uint8_t *line_ptrs[481];
 
 /// @brief A handler for DMA_IRQ_0. Indicates that a full frame has been written to pio and the dma channels must be restarted to draw the next frame.
 static void null_trigger_irq(void) {
-  dma_channel_acknowledge_irq0(rgb_chan);
-  irq_clear(DMA_IRQ_0);
+    dma_channel_acknowledge_irq0(rgb_chan);
+    irq_clear(DMA_IRQ_0);
 
-  dma_channel_set_read_addr(reconf_chan, line_ptrs, true);
+    dma_channel_set_read_addr(reconf_chan, line_ptrs, true);
 }
 
 void initVGA() {
-        // Choose which PIO instance to use (there are two instances, each with 4 state machines)
+    // Choose which PIO instance to use (there are two instances, each with 4 state machines)
     PIO pio = pio0;
 
     // Our assembled program needs to be loaded into this PIO's instruction
@@ -102,7 +102,7 @@ void initVGA() {
     // Generate two pointers to every line in vga_data_array to be used as dma control blocks
     const int stop = count_of(line_ptrs) - 1; // - 1 cause last one is for null trigger
     for (int i = 0; i < stop; i++)
-      line_ptrs[i] = vga_data_array + ((i/2) * 160); // 160 = bytes per line. i/2 to print every line twice.
+        line_ptrs[i] = vga_data_array + ((i/2) * 160); // 160 = bytes per line. i/2 to print every line twice.
     line_ptrs[stop] = 0; // initialize null trigger
 
     // Claim two channels
@@ -175,34 +175,30 @@ void initVGA() {
 void drawPixel(short x, short y, char color) {
     // Range checks (640x480 display)
     if (x > _width-1) x = _width-1;
-    if (x < 0) x = 0 ;
-    if (y < 0) y = 0 ;
-    if (y > _height-1) y = _height-1 ;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (y > _height-1) y = _height-1;
 
     // Which pixel is it?
-    int pixel = ((_width * y) + x) ;
+    int pixel = ((_width * y) + x);
 
     // Is this pixel stored in the first 3 bits
     // of the vga data array index, or the second
     // 3 bits? Check, then mask.
-    if (pixel & 1) {
-        vga_data_array[pixel>>1] = (vga_data_array[pixel>>1] & TOPMASK) | (color << 3) ;
-    }
-    else {
-        vga_data_array[pixel>>1] = (vga_data_array[pixel>>1] & BOTTOMMASK) | (color) ;
-    }
+    if (pixel & 1)
+        vga_data_array[pixel>>1] = (vga_data_array[pixel>>1] & TOPMASK) | (color << 3);
+    else
+        vga_data_array[pixel>>1] = (vga_data_array[pixel>>1] & BOTTOMMASK) | (color);
 }
 
 void drawVLine(short x, short y, short h, char color) {
-    for (short i=y; i<(y+h); i++) {
-        drawPixel(x, i, color) ;
-    }
+    for (short i=y; i<(y+h); i++)
+        drawPixel(x, i, color);
 }
 
 void drawHLine(short x, short y, short w, char color) {
-    for (short i=x; i<(x+w); i++) {
-        drawPixel(i, y, color) ;
-    }
+    for (short i=x; i<(x+w); i++)
+        drawPixel(i, y, color);
 }
 
 // Bresenham's algorithm - thx wikipedia and thx Bruce!
@@ -219,42 +215,41 @@ void drawLine(short x0, short y0, short x1, short y1, char color) {
  *          the top-left of the screen is 0. It increases to the bottom.
  *      color: 3-bit color value for line
  */
-      short steep = abs(y1 - y0) > abs(x1 - x0);
-      if (steep) {
+    short steep = abs(y1 - y0) > abs(x1 - x0);
+    if (steep) {
         swap(x0, y0);
         swap(x1, y1);
-      }
+    }
 
-      if (x0 > x1) {
+    if (x0 > x1) {
         swap(x0, x1);
         swap(y0, y1);
-      }
+    }
 
-      short dx, dy;
-      dx = x1 - x0;
-      dy = abs(y1 - y0);
+    short dx, dy;
+    dx = x1 - x0;
+    dy = abs(y1 - y0);
 
-      short err = dx / 2;
-      short ystep;
+    short err = dx / 2;
+    short ystep;
 
-      if (y0 < y1) {
+    if (y0 < y1)
         ystep = 1;
-      } else {
+    else
         ystep = -1;
-      }
 
-      for (; x0<=x1; x0++) {
-        if (steep) {
-          drawPixel(y0, x0, color);
-        } else {
-          drawPixel(x0, y0, color);
-        }
+    for (; x0<=x1; x0++) {
+        if (steep)
+            drawPixel(y0, x0, color);
+        else
+            drawPixel(x0, y0, color);
+            
         err -= dy;
         if (err < 0) {
-          y0 += ystep;
-          err += dx;
+            y0 += ystep;
+            err += dx;
         }
-      }
+    }
 }
 
 // Draw a rectangle
@@ -271,10 +266,10 @@ void drawRect(short x, short y, short w, short h, char color) {
  *      color:  16-bit color of the rectangle outline
  * Returns: Nothing
  */
-  drawHLine(x, y, w, color);
-  drawHLine(x, y+h-1, w, color);
-  drawVLine(x, y, h, color);
-  drawVLine(x+w-1, y, h, color);
+    drawHLine(x, y, w, color);
+    drawHLine(x, y+h-1, w, color);
+    drawVLine(x, y, h, color);
+    drawVLine(x+w-1, y, h, color);
 }
 
 void drawCircle(short x0, short y0, short r, char color) {
@@ -289,72 +284,72 @@ void drawCircle(short x0, short y0, short r, char color) {
  *          isn't filled. So, this is the color of the outline of the circle
  * Returns: Nothing
  */
-  short f = 1 - r;
-  short ddF_x = 1;
-  short ddF_y = -2 * r;
-  short x = 0;
-  short y = r;
+    short f = 1 - r;
+    short ddF_x = 1;
+    short ddF_y = -2 * r;
+    short x = 0;
+    short y = r;
 
-  drawPixel(x0  , y0+r, color);
-  drawPixel(x0  , y0-r, color);
-  drawPixel(x0+r, y0  , color);
-  drawPixel(x0-r, y0  , color);
+    drawPixel(x0  , y0+r, color);
+    drawPixel(x0  , y0-r, color);
+    drawPixel(x0+r, y0  , color);
+    drawPixel(x0-r, y0  , color);
 
-  while (x<y) {
-    if (f >= 0) {
-      y--;
-      ddF_y += 2;
-      f += ddF_y;
+    while (x<y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
+
+        drawPixel(x0 + x, y0 + y, color);
+        drawPixel(x0 - x, y0 + y, color);
+        drawPixel(x0 + x, y0 - y, color);
+        drawPixel(x0 - x, y0 - y, color);
+        drawPixel(x0 + y, y0 + x, color);
+        drawPixel(x0 - y, y0 + x, color);
+        drawPixel(x0 + y, y0 - x, color);
+        drawPixel(x0 - y, y0 - x, color);
     }
-    x++;
-    ddF_x += 2;
-    f += ddF_x;
-
-    drawPixel(x0 + x, y0 + y, color);
-    drawPixel(x0 - x, y0 + y, color);
-    drawPixel(x0 + x, y0 - y, color);
-    drawPixel(x0 - x, y0 - y, color);
-    drawPixel(x0 + y, y0 + x, color);
-    drawPixel(x0 - y, y0 + x, color);
-    drawPixel(x0 + y, y0 - x, color);
-    drawPixel(x0 - y, y0 - x, color);
-  }
 }
 
 void drawCircleHelper( short x0, short y0, short r, unsigned char cornername, char color) {
 // Helper function for drawing circles and circular objects
-  short f     = 1 - r;
-  short ddF_x = 1;
-  short ddF_y = -2 * r;
-  short x     = 0;
-  short y     = r;
+    short f     = 1 - r;
+    short ddF_x = 1;
+    short ddF_y = -2 * r;
+    short x     = 0;
+    short y     = r;
 
-  while (x<y) {
-    if (f >= 0) {
-      y--;
-      ddF_y += 2;
-      f     += ddF_y;
+    while (x<y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
+        if (cornername & 0x4) {
+            drawPixel(x0 + x, y0 + y, color);
+            drawPixel(x0 + y, y0 + x, color);
+        }
+        if (cornername & 0x2) {
+            drawPixel(x0 + x, y0 - y, color);
+            drawPixel(x0 + y, y0 - x, color);
+        }
+        if (cornername & 0x8) {
+            drawPixel(x0 - y, y0 + x, color);
+            drawPixel(x0 - x, y0 + y, color);
+        }
+        if (cornername & 0x1) {
+            drawPixel(x0 - y, y0 - x, color);
+            drawPixel(x0 - x, y0 - y, color);
+        }
     }
-    x++;
-    ddF_x += 2;
-    f     += ddF_x;
-    if (cornername & 0x4) {
-      drawPixel(x0 + x, y0 + y, color);
-      drawPixel(x0 + y, y0 + x, color);
-    }
-    if (cornername & 0x2) {
-      drawPixel(x0 + x, y0 - y, color);
-      drawPixel(x0 + y, y0 - x, color);
-    }
-    if (cornername & 0x8) {
-      drawPixel(x0 - y, y0 + x, color);
-      drawPixel(x0 - x, y0 + y, color);
-    }
-    if (cornername & 0x1) {
-      drawPixel(x0 - y, y0 - x, color);
-      drawPixel(x0 - x, y0 - y, color);
-    }
-  }
 }
 
 void fillCircle(short x0, short y0, short r, char color) {
@@ -374,31 +369,31 @@ void fillCircle(short x0, short y0, short r, char color) {
 
 void fillCircleHelper(short x0, short y0, short r, unsigned char cornername, short delta, char color) {
 // Helper function for drawing filled circles
-  short f     = 1 - r;
-  short ddF_x = 1;
-  short ddF_y = -2 * r;
-  short x     = 0;
-  short y     = r;
+    short f     = 1 - r;
+    short ddF_x = 1;
+    short ddF_y = -2 * r;
+    short x     = 0;
+    short y     = r;
 
-  while (x<y) {
-    if (f >= 0) {
-      y--;
-      ddF_y += 2;
-      f     += ddF_y;
-    }
-    x++;
-    ddF_x += 2;
-    f     += ddF_x;
+    while (x<y) {
+        if (f >= 0) {
+            y--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x++;
+        ddF_x += 2;
+        f += ddF_x;
 
-    if (cornername & 0x1) {
-      drawVLine(x0+x, y0-y, 2*y+1+delta, color);
-      drawVLine(x0+y, y0-x, 2*x+1+delta, color);
+        if (cornername & 0x1) {
+            drawVLine(x0+x, y0-y, 2*y+1+delta, color);
+            drawVLine(x0+y, y0-x, 2*x+1+delta, color);
+        }
+        if (cornername & 0x2) {
+            drawVLine(x0-x, y0-y, 2*y+1+delta, color);
+            drawVLine(x0-y, y0-x, 2*x+1+delta, color);
+        }
     }
-    if (cornername & 0x2) {
-      drawVLine(x0-x, y0-y, 2*y+1+delta, color);
-      drawVLine(x0-y, y0-x, 2*x+1+delta, color);
-    }
-  }
 }
 
 // Draw a rounded rectangle
@@ -415,28 +410,27 @@ void drawRoundRect(short x, short y, short w, short h, short r, char color) {
  *      color:  16-bit color of the rectangle outline
  * Returns: Nothing
  */
-  // smarter version
-  drawHLine(x+r  , y    , w-2*r, color); // Top
-  drawHLine(x+r  , y+h-1, w-2*r, color); // Bottom
-  drawVLine(x    , y+r  , h-2*r, color); // Left
-  drawVLine(x+w-1, y+r  , h-2*r, color); // Right
-  // draw four corners
-  drawCircleHelper(x+r    , y+r    , r, 1, color);
-  drawCircleHelper(x+w-r-1, y+r    , r, 2, color);
-  drawCircleHelper(x+w-r-1, y+h-r-1, r, 4, color);
-  drawCircleHelper(x+r    , y+h-r-1, r, 8, color);
+    // smarter version
+    drawHLine(x+r  , y    , w-2*r, color); // Top
+    drawHLine(x+r  , y+h-1, w-2*r, color); // Bottom
+    drawVLine(x    , y+r  , h-2*r, color); // Left
+    drawVLine(x+w-1, y+r  , h-2*r, color); // Right
+    // draw four corners
+    drawCircleHelper(x+r    , y+r    , r, 1, color);
+    drawCircleHelper(x+w-r-1, y+r    , r, 2, color);
+    drawCircleHelper(x+w-r-1, y+h-r-1, r, 4, color);
+    drawCircleHelper(x+r    , y+h-r-1, r, 8, color);
 }
 
 // Fill a rounded rectangle
 void fillRoundRect(short x, short y, short w, short h, short r, char color) {
-  // smarter version
-  fillRect(x+r, y, w-2*r, h, color);
+    // smarter version
+    fillRect(x+r, y, w-2*r, h, color);
 
-  // draw four corners
-  fillCircleHelper(x+w-r-1, y+r, r, 1, h-2*r-1, color);
-  fillCircleHelper(x+r    , y+r, r, 2, h-2*r-1, color);
+    // draw four corners
+    fillCircleHelper(x+w-r-1, y+r, r, 1, h-2*r-1, color);
+    fillCircleHelper(x+r    , y+r, r, 2, h-2*r-1, color);
 }
-
 
 // fill a rectangle
 void fillRect(short x, short y, short w, short h, char color) {
@@ -453,51 +447,47 @@ void fillRect(short x, short y, short w, short h, char color) {
  * Returns:     Nothing
  */
 
-  // rudimentary clipping (drawChar w/big text requires this)
-  // if((x >= _width) || (y >= _height)) return;
-  // if((x + w - 1) >= _width)  w = _width  - x;
-  // if((y + h - 1) >= _height) h = _height - y;
+    // rudimentary clipping (drawChar w/big text requires this)
+    // if((x >= _width) || (y >= _height)) return;
+    // if((x + w - 1) >= _width)  w = _width  - x;
+    // if((y + h - 1) >= _height) h = _height - y;
 
-  // tft_setAddrWindow(x, y, x+w-1, y+h-1);
+    // tft_setAddrWindow(x, y, x+w-1, y+h-1);
 
-  for(int i=x; i<(x+w); i++) {
-    for(int j=y; j<(y+h); j++) {
-        drawPixel(i, j, color);
-    }
-  }
+    for(int i = x; i < (x + w); i++)
+        for (int j = y; j < (y + h); j++)
+            drawPixel(i, j, color);
 }
 
 // Draw a character
 void drawChar(short x, short y, unsigned char c, char color, char bg, unsigned char size) {
     char i, j;
-  if((x >= _width)            || // Clip right
-     (y >= _height)           || // Clip bottom
-     ((x + 6 * size - 1) < 0) || // Clip left
-     ((y + 8 * size - 1) < 0))   // Clip top
-    return;
+    if  ((x >= _width)           || // Clip right
+        (y >= _height)           || // Clip bottom
+        ((x + 6 * size - 1) < 0) || // Clip left
+        ((y + 8 * size - 1) < 0))   // Clip top
+        return;
 
-  for (i=0; i<6; i++ ) {
-    unsigned char line;
-    if (i == 5)
-      line = 0x0;
-    else
-      line = pgm_read_byte(font+(c*5)+i);
-    for ( j = 0; j<8; j++) {
-      if (line & 0x1) {
-        if (size == 1) // default size
-          drawPixel(x+i, y+j, color);
-        else {  // big size
-          fillRect(x+(i*size), y+(j*size), size, size, color);
+  for (i = 0; i < 6; i++) {
+        unsigned char line;
+        if (i == 5)
+            line = 0x0;
+        else
+            line = pgm_read_byte(font+(c*5)+i);
+        for ( j = 0; j<8; j++) {
+            if (line & 0x1) {
+                if (size == 1) // default size
+                    drawPixel(x+i, y+j, color);
+                else // big size
+                    fillRect(x+(i*size), y+(j*size), size, size, color);
+            } else if (bg != color) {
+                if (size == 1) // default size
+                    drawPixel(x+i, y+j, bg);
+                else  // big size
+                    fillRect(x+i*size, y+j*size, size, size, bg);
+            }
+            line >>= 1;
         }
-      } else if (bg != color) {
-        if (size == 1) // default size
-          drawPixel(x+i, y+j, bg);
-        else {  // big size
-          fillRect(x+i*size, y+j*size, size, size, bg);
-        }
-      }
-      line >>= 1;
-    }
   }
 }
 
@@ -543,33 +533,30 @@ inline void setTextWrap(char w) {
 }
 
 
-void tft_write(unsigned char c){
-  if (c == '\n') {
-    cursor_y += textsize*8;
-    cursor_x  = 0;
-  } else if (c == '\r') {
-    // skip em
-  } else if (c == '\t'){
-      int new_x = cursor_x + tabspace;
-      if (new_x < _width){
-          cursor_x = new_x;
-      }
-  } else {
-    drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
-    cursor_x += textsize*6;
-    if (wrap && (cursor_x > (_width - textsize*6))) {
-      cursor_y += textsize*8;
-      cursor_x = 0;
+void tft_write(unsigned char c) {
+    if (c == '\n') {
+        cursor_y += textsize*8;
+        cursor_x  = 0;
+    } else if (c == '\r') {
+        // skip em
+    } else if (c == '\t'){
+        int new_x = cursor_x + tabspace;
+        if (new_x < _width)
+            cursor_x = new_x;
+    } else {
+        drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
+        cursor_x += textsize*6;
+        if (wrap && (cursor_x > (_width - textsize*6))) {
+            cursor_y += textsize*8;
+            cursor_x = 0;
+        }
     }
-  }
 }
 
-inline void writeString(char* str){
+inline void writeString(char* str) {
 /* Print text onto screen
  * Call tft_setCursor(), tft_setTextColor(), tft_setTextSize()
  *  as necessary before printing
  */
-    while (*str){
-        tft_write(*str++);
-    }
+    while (*str) tft_write(*str++);
 }
