@@ -42,5 +42,8 @@ target_sources(graphics_test PRIVATE vga_graphics_demo.c vga_graphics.c)
 # must match with executable name
 target_link_libraries(graphics_test PRIVATE pico_stdlib hardware_pio hardware_dma hardware_adc hardware_irq)
 
+pico_enable_stdio_usb(graphics_test 1)  # Enable USB output
+pico_enable_stdio_uart(graphics_test 0) # Disable UART (optional)
+
 # must match with executable name
 pico_add_extra_outputs(graphics_test)
