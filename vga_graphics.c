@@ -37,8 +37,9 @@ int rgb_chan;
 // DMA channel that reconfigures and restarts rgb_chan
 int reconf_chan;
 
-/// @brief Pointers into vga_data_array that point to lines. There are two consecutive pointers per line.
-uint8_t *line_ptrs[481];
+#if SCREEN_WIDTH != 640
+/// @brief Pointers into vga_data_array that point to lines. There are INTERNAL_TO_EXTERNAL_SCALE consecutive pointers per line to cause virtical scaling.
+uint8_t *line_ptrs[SCREEN_HEIGHT * INTERNAL_TO_EXTERNAL_SCALE + 1];
 
 /// @brief A handler for DMA_IRQ_0. Indicates that a full frame has been written to pio and the dma channels must be restarted to draw the next frame.
 static void null_trigger_irq(void) {
@@ -47,6 +48,7 @@ static void null_trigger_irq(void) {
 
     dma_channel_set_read_addr(reconf_chan, line_ptrs, true);
 }
+#endif
 
 void initVGA() {
     // Choose which PIO instance to use (there are two instances, each with 4 state machines)
@@ -84,15 +86,49 @@ void initVGA() {
     // ============================== PIO DMA Channels =================================================
     /////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // Generate two pointers to every line in vga_data_array to be used as dma control blocks
-    const int stop = count_of(line_ptrs) - 1; // - 1 cause last one is for null trigger
-    for (int i = 0; i < stop; i++)
-        line_ptrs[i] = vga_data_array + ((i/2) * LINE_BYTES); // 160 = bytes per line. i/2 to print every line twice.
-    line_ptrs[stop] = 0; // initialize null trigger
-
     // Claim two channels
     rgb_chan = dma_claim_unused_channel(true);
     reconf_chan = dma_claim_unused_channel(true);
+
+#if SCREEN_WIDTH == 640
+    static unsigned char *vga_data_array_ptr = &vga_data_array[0];
+    // Channel Zero (sends color data to PIO VGA machine)
+    dma_channel_config c0 = dma_channel_get_default_config(rgb_chan);    // default configs
+    channel_config_set_transfer_data_size(&c0, DMA_SIZE_8);              // 8-bit txfers
+    channel_config_set_read_increment(&c0, true);                        // yes read incrementing
+    channel_config_set_write_increment(&c0, false);                      // no write incrementing
+    channel_config_set_dreq(&c0, DREQ_PIO0_TX2) ;                        // DREQ_PIO0_TX2 pacing (FIFO)
+    channel_config_set_chain_to(&c0, reconf_chan);                       // chain to other channel
+
+    dma_channel_configure(
+        rgb_chan,                   // Channel to be configured
+        &c0,                        // The configuration we just created
+        &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
+        &vga_data_array,            // The initial read address (pixel color array)
+        TXCOUNT,                    // Number of transfers
+        false                       // Don't start immediately.
+    );
+
+    // Channel One (reconfigures the first channel)
+    c0 = dma_channel_get_default_config(reconf_chan);         // default configs
+    channel_config_set_transfer_data_size(&c0, DMA_SIZE_32);  // 32-bit txfers
+    channel_config_set_read_increment(&c0, false);            // no read incrementing
+    channel_config_set_write_increment(&c0, false);           // no write incrementing
+
+    dma_channel_configure(
+        reconf_chan,                              // Channel to be configured
+        &c0,                                      // The configuration we just created
+        &dma_hw->ch[rgb_chan].al3_read_addr_trig, // Write address (channel 0 read address)
+        &vga_data_array_ptr,                      // Read address (POINTER TO AN ADDRESS)
+        1,                                        // Number of transfers, in this case each is 4 byte
+        false                                     // Don't start immediately.
+    );
+#else
+    // Generate two pointers to every line in vga_data_array to be used as dma control blocks
+    const int stop = count_of(line_ptrs) - 1; // - 1 cause last one is for null trigger
+    for (int i = 0; i < stop; i++)
+        line_ptrs[i] = vga_data_array + ((i/INTERNAL_TO_EXTERNAL_SCALE) * LINE_BYTES); // 160 = bytes per line. i/2 to print every line twice.
+    line_ptrs[stop] = 0; // initialize null trigger
 
     // Channel Zero (sends color data to PIO VGA machine)
     dma_channel_config c0 = dma_channel_get_default_config(rgb_chan);    // default configs
@@ -129,6 +165,7 @@ void initVGA() {
         1,                                        // Number of transfers, in this case each is 4 byte
         false                                     // Don't start immediately.
     );
+#endif
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////

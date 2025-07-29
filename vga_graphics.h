@@ -28,8 +28,16 @@ enum vga_pins {HSYNC=16, VSYNC, RED_PIN, GREEN_PIN, BLUE_PIN};
 // We can only produce 8 (3-bit) colors, so let's give them readable names - usable in main()
 enum colors {BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE};
 
+// (internal) Screen width/height.
+// These can be adjusted lower than 640x480 as long as they are adjusted equally and by a multiple of 2.
+// If these are adjusted, the rgb.pio timings must also be adjusted proportionally.
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
+
+#define INTERNAL_TO_EXTERNAL_SCALE (640 / SCREEN_WIDTH)
+
 /// @brief The number of pixel bytes in a single line.
-#define LINE_BYTES 160
+#define LINE_BYTES (SCREEN_WIDTH / 2)
 
 /// @brief The number of pixel bytes in a single terminal row.
 #define ROW_BYTES (LINE_BYTES * 8)
@@ -38,10 +46,6 @@ enum colors {BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE};
 #define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE   479    // (active - 1)
 #define RGB_ACTIVE (LINE_BYTES - 1)    // number of bytes sent per line - 1
-
-// (internal) Screen width/height
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
 
 // Length of the pixel array
 #define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // Total internal pixels/2 (since we have 2 pixels per byte)
