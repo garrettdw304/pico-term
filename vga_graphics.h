@@ -40,11 +40,11 @@ enum colors {BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE};
 #define RGB_ACTIVE (LINE_BYTES - 1)    // number of bytes sent per line - 1
 
 // (internal) Screen width/height
-#define WIDTH 320
-#define HEIGHT 240
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
 
 // Length of the pixel array
-#define TXCOUNT (WIDTH * HEIGHT / 2) // Total internal pixels/2 (since we have 2 pixels per byte)
+#define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // Total internal pixels/2 (since we have 2 pixels per byte)
 
 // Pixel color array that is DMA's to the PIO machines and
 // a pointer to the ADDRESS of this color array.

@@ -159,13 +159,13 @@ void initVGA() {
 // pixels will be automatically updated on the screen.
 void drawPixel(short x, short y, char color) {
     // Range checks (640x480 display)
-    if (x > WIDTH-1) x = WIDTH-1;
+    if (x > SCREEN_WIDTH-1) x = SCREEN_WIDTH-1;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (y > HEIGHT-1) y = HEIGHT-1;
+    if (y > SCREEN_HEIGHT-1) y = SCREEN_HEIGHT-1;
 
     // Which pixel is it?
-    int pixel = ((WIDTH * y) + x);
+    int pixel = ((SCREEN_WIDTH * y) + x);
 
     // Is this pixel stored in the first 3 bits
     // of the vga data array index, or the second
@@ -447,8 +447,8 @@ void fillRect(short x, short y, short w, short h, char color) {
 // Draw a character
 void drawChar(short x, short y, unsigned char c, char color, char bg, unsigned char size) {
     char i, j;
-    if  ((x >= WIDTH)           || // Clip right
-        (y >= HEIGHT)           || // Clip bottom
+    if  ((x >= SCREEN_WIDTH)           || // Clip right
+        (y >= SCREEN_HEIGHT)           || // Clip bottom
         ((x + 6 * size - 1) < 0) || // Clip left
         ((y + 8 * size - 1) < 0))   // Clip top
         return;
@@ -524,12 +524,12 @@ void tft_write(unsigned char c) {
         // skip em
     } else if (c == '\t'){
         int new_x = cursor_x + tabspace;
-        if (new_x < WIDTH)
+        if (new_x < SCREEN_WIDTH)
             cursor_x = new_x;
     } else {
         drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
         cursor_x += textsize*6;
-        if (wrap && (cursor_x > (WIDTH - textsize*6))) {
+        if (wrap && (cursor_x > (SCREEN_WIDTH - textsize*6))) {
             cursor_y += textsize*8;
             cursor_x = 0;
         }

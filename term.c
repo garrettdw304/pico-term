@@ -1,20 +1,25 @@
 #include "vga_graphics.h"
 #include "hardware/dma.h"
 #include "stdbool.h"
+#include "term.h"
+
+// Size of a monospaced character
+#define CHAR_WIDTH 6
+#define CHAR_HEIGHT 8
 
 // Terminal rows and columns
-#define TERM_ROWS 30
-#define TERM_COLS 40
+#define TERM_ROWS (SCREEN_HEIGHT / CHAR_HEIGHT)
+#define TERM_COLS (SCREEN_WIDTH / CHAR_WIDTH)
 
 /// @brief DMA Channel used by term for various things.
-int termChan;
-dma_channel_config shiftUpConfig;
-dma_channel_config clearConfig;
+static int termChan;
+static dma_channel_config shiftUpConfig;
+static dma_channel_config clearConfig;
 
-uint32_t termCol = 0;
-uint32_t termRow = TERM_ROWS - 1;
+static uint32_t termCol = 0;
+static uint32_t termRow = TERM_ROWS - 1;
 /// @brief When reaching the end of a row, move to the next automatically?
-bool wrap = true;
+static bool wrap = true;
 
 /// @brief Advances the cursor.
 static void advance(void) {
@@ -37,9 +42,9 @@ void term_init(void) {
     termChan = dma_claim_unused_channel(true);
 
     shiftUpConfig = dma_channel_get_default_config(termChan);
-    channel_config_set_transfer_data_size(&termChan, DMA_SIZE_8);
-    channel_config_set_read_increment(&termChan, true);
-    channel_config_set_write_increment(&termChan, true);
+    channel_config_set_transfer_data_size(&shiftUpConfig, DMA_SIZE_8);
+    channel_config_set_read_increment(&shiftUpConfig, true);
+    channel_config_set_write_increment(&shiftUpConfig, true);
 
     clearConfig = dma_channel_get_default_config(termChan);
     channel_config_set_transfer_data_size(&clearConfig, DMA_SIZE_8);
@@ -58,7 +63,7 @@ void term_shift_up(void) {
     dma_channel_wait_for_finish_blocking(termChan);
 
     // Clear bottom row
-    clearRow(TERM_ROWS - 1);
+    term_clear_row(TERM_ROWS - 1);
 }
 
 /// @brief Clears an entire row.
@@ -82,9 +87,9 @@ void term_clear_from_start(uint32_t row, uint32_t col) {
     if (col >= TERM_COLS) return;
 
     if (col == TERM_COLS - 1)
-        clearRow(row);
+        term_clear_row(row);
     else
-        fillRect(0, row * 8, (col + 1) * 8, 8, BLACK); // TODO: DMA?
+        fillRect(0, row * CHAR_HEIGHT, (col + 1) * CHAR_WIDTH, CHAR_HEIGHT, BLACK); // TODO: DMA?
 }
 
 /// @brief Clears from the end of row, to and including col.
@@ -93,24 +98,25 @@ void term_clear_from_end(uint32_t row, uint32_t col) {
     if (col >= TERM_COLS) return;
 
     if (col == 0)
-        clearRow(row);
+        term_clear_row(row);
     else
-        fillRect(col * 8, row * 8, WIDTH - col * 8, 8, BLACK); // TODO: DMA?
+        fillRect(col * CHAR_WIDTH, row * CHAR_HEIGHT, SCREEN_WIDTH - col * CHAR_WIDTH, CHAR_HEIGHT, BLACK); // TODO: DMA?
 }
 
 void term_process(char input) {
     if (input == '\033') { // ESC
 
     }
-    else if (input == '\n') {
+    else if (input == '\r') {
+        termCol = 0;
         termRow++;
         if (termRow >= TERM_ROWS) {
             term_shift_up();
             termRow = TERM_ROWS - 1;
         }
     }
-    else if (input == '\r') {
-        termCol = 0;
+    else if (input == '\n') {
+
     }
     else if (input == 8) { // backspace
         if (termCol > 0)
@@ -123,7 +129,7 @@ void term_process(char input) {
 
     }
     else {
-        drawChar(termCol * 8, termRow * 8, input, WHITE, BLACK, 1);
+        drawChar(termCol * CHAR_WIDTH, termRow * CHAR_HEIGHT, input, WHITE, BLACK, 1);
         advance();
     }
 }

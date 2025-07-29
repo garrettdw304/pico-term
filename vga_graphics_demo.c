@@ -35,9 +35,8 @@ int main() {
 
     term_init();
 
-    char *str = "Hello, world!";
-    while (*str != '\0')
-        term_process(*str++);
+    while (true)
+        term_process(getchar());
 
     while (true) tight_loop_contents();
 }
