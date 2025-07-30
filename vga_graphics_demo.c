@@ -35,6 +35,9 @@ int main() {
 
     term_init();
 
+    for (int i = 32; i < 127; i++)
+        term_process((char)i);
+
     while (true)
         term_process(getchar());
 

@@ -2,6 +2,8 @@
 #include "hardware/dma.h"
 #include "stdbool.h"
 #include "term.h"
+#include "pico/multicore.h"
+#include "pico/stdlib.h"
 
 // Size of a monospaced character
 #define CHAR_WIDTH 6
@@ -10,6 +12,11 @@
 // Terminal rows and columns
 #define TERM_ROWS (SCREEN_HEIGHT / CHAR_HEIGHT)
 #define TERM_COLS (SCREEN_WIDTH / CHAR_WIDTH)
+
+typedef struct {
+    /// @brief One pixel per byte for simplicity.
+    uint8_t pixels[CHAR_WIDTH * CHAR_HEIGHT];
+} TermChar;
 
 /// @brief DMA Channel used by term for various things.
 static int termChan;
@@ -21,21 +28,68 @@ static uint32_t termRow = TERM_ROWS - 1;
 /// @brief When reaching the end of a row, move to the next automatically?
 static bool wrap = true;
 
+// ===================================== Cursor ==================================
+static TermChar charAtCursor = {0};
+static TermChar cursorTexture = {0};
+
+static char colorAt(int x, int y) {
+    if (x >= SCREEN_WIDTH) return 0;
+    if (y >= SCREEN_HEIGHT) return 0;
+
+    char colors = vga_data_array[((y * SCREEN_WIDTH) + x) / 2];
+    return ((x & 1) == 0 ? (colors) : (colors >> 3)) & 0b00000111;
+}
+
+static char getColor(TermChar *c, int x, int y) {
+    if (x >= CHAR_WIDTH) return 0;
+    if (y >= CHAR_HEIGHT) return 0;
+
+    return c->pixels[(y * CHAR_WIDTH) + x];
+}
+
+static void setColor(TermChar *c, char color, int x, int y) {
+    if (x >= SCREEN_WIDTH) return;
+    if (y >= SCREEN_HEIGHT) return;
+
+    c->pixels[(y * CHAR_WIDTH) + x] = color;
+}
+
+/// @brief Removes the cursor at termCol,termRow by drawing charAtCursor at the same location.
+static void eraseCursor(void) {
+    for (int y = 0; y < CHAR_HEIGHT; y++)
+        for (int x = 0; x < CHAR_WIDTH; x++)
+            drawPixel(termCol * CHAR_WIDTH + x, termRow * CHAR_HEIGHT + y, getColor(&charAtCursor, x, y));
+}
+
+/// @brief Draws the cursor at termCol,termRow.
+static void drawCursor(void) {
+    // Save character at cursor
+    for (int y = 0; y < CHAR_HEIGHT; y++)
+        for (int x = 0; x < CHAR_WIDTH; x++)
+            setColor(&charAtCursor, colorAt(termCol * CHAR_WIDTH + x, termRow * CHAR_HEIGHT + y), x, y);
+
+    // Draw cursor
+    for (int y = 0; y < CHAR_HEIGHT; y++)
+        for (int x = 0; x < CHAR_WIDTH; x++)
+            drawPixel(termCol * CHAR_WIDTH + x, termRow * CHAR_HEIGHT + y, getColor(&cursorTexture, x, y));
+}
+// ===================================== Cursor END ==============================
+
 /// @brief Advances the cursor.
 static void advance(void) {
-        termCol++;
-        if (termCol >= TERM_COLS) {
-            if (wrap) {
-                termCol = 0;
-                termRow++;
-                if (termRow >= TERM_ROWS) {
-                    term_shift_up();
-                    termRow = TERM_ROWS - 1;
-                }
+    termCol++;
+    if (termCol >= TERM_COLS) {
+        if (wrap) {
+            termCol = 0;
+            termRow++;
+            if (termRow >= TERM_ROWS) {
+                term_shift_up();
+                termRow = TERM_ROWS - 1;
             }
-            else
-                termCol--;
         }
+        else
+            termCol--;
+    }
 }
 
 void term_init(void) {
@@ -50,6 +104,24 @@ void term_init(void) {
     channel_config_set_transfer_data_size(&clearConfig, DMA_SIZE_8);
     channel_config_set_read_increment(&clearConfig, false);
     channel_config_set_write_increment(&clearConfig, true);
+
+    // Horizontal bar cursor
+    // for (int i = 0; i < CHAR_WIDTH; i++) {
+    //     setColor(&cursorTexture, WHITE, i, 6);
+    //     setColor(&cursorTexture, WHITE, i, 7);
+    // }
+
+    // Vertical bar cursor
+    for (int i = 0; i < CHAR_HEIGHT; i++) {
+        setColor(&cursorTexture, WHITE, 0, i);
+        setColor(&cursorTexture, WHITE, 1, i);
+    }
+
+    // Full cursor
+    // for (int i = 0; i < count_of(cursorTexture.pixels); i++)
+    //     cursorTexture.pixels[i] = WHITE;
+
+    drawCursor();
 }
 
 /// @brief Move all rows up one.
@@ -108,19 +180,25 @@ void term_process(char input) {
 
     }
     else if (input == '\r') {
+        eraseCursor();
         termCol = 0;
         termRow++;
         if (termRow >= TERM_ROWS) {
             term_shift_up();
             termRow = TERM_ROWS - 1;
         }
+        drawCursor();
     }
     else if (input == '\n') {
 
     }
     else if (input == 8) { // backspace
         if (termCol > 0)
+        {
+            eraseCursor();
             termCol--;
+            drawCursor();
+        }
     }
     else if (input < 32) {
 
@@ -131,5 +209,6 @@ void term_process(char input) {
     else {
         drawChar(termCol * CHAR_WIDTH, termRow * CHAR_HEIGHT, input, WHITE, BLACK, 1);
         advance();
+        drawCursor();
     }
 }
