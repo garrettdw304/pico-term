@@ -30,6 +30,7 @@ static bool wrap = true;
 
 // ===================================== Cursor ==================================
 static TermChar charAtCursor = {0};
+/// @brief BLACK = transparent, other than that color does not matter.
 static TermChar cursorTexture = {0};
 
 static char colorAt(int x, int y) {
@@ -71,7 +72,13 @@ static void drawCursor(void) {
     // Draw cursor
     for (int y = 0; y < CHAR_HEIGHT; y++)
         for (int x = 0; x < CHAR_WIDTH; x++)
-            drawPixel(termCol * CHAR_WIDTH + x, termRow * CHAR_HEIGHT + y, getColor(&cursorTexture, x, y));
+        {
+            if (getColor(&cursorTexture, x, y) == BLACK) // BLACK = transparent
+                continue;
+            int xPos = termCol * CHAR_WIDTH + x;
+            int yPos = termRow * CHAR_HEIGHT + y;
+            drawPixel(xPos, yPos, colorAt(xPos, yPos) == WHITE ? BLACK : WHITE);
+        }
 }
 // ===================================== Cursor END ==============================
 
@@ -106,16 +113,16 @@ void term_init(void) {
     channel_config_set_write_increment(&clearConfig, true);
 
     // Horizontal bar cursor
-    // for (int i = 0; i < CHAR_WIDTH; i++) {
-    //     setColor(&cursorTexture, WHITE, i, 6);
-    //     setColor(&cursorTexture, WHITE, i, 7);
-    // }
+    for (int i = 0; i < CHAR_WIDTH; i++) {
+        setColor(&cursorTexture, WHITE, i, 6);
+        setColor(&cursorTexture, WHITE, i, 7);
+    }
 
     // Vertical bar cursor
-    for (int i = 0; i < CHAR_HEIGHT; i++) {
-        setColor(&cursorTexture, WHITE, 0, i);
-        setColor(&cursorTexture, WHITE, 1, i);
-    }
+    // for (int i = 0; i < CHAR_HEIGHT; i++) {
+    //     setColor(&cursorTexture, WHITE, 0, i);
+    //     setColor(&cursorTexture, WHITE, 1, i);
+    // }
 
     // Full cursor
     // for (int i = 0; i < count_of(cursorTexture.pixels); i++)
@@ -200,13 +207,13 @@ void term_process(char input) {
             drawCursor();
         }
     }
-    else if (input < 32) {
+    else if (input < 32) { // control characters
 
     }
     else if (input == 127) { // delete
 
     }
-    else {
+    else { // printable characters
         drawChar(termCol * CHAR_WIDTH, termRow * CHAR_HEIGHT, input, WHITE, BLACK, 1);
         advance();
         drawCursor();
