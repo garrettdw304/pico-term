@@ -2,7 +2,6 @@
 #include "hardware/dma.h"
 #include "stdbool.h"
 #include "term.h"
-#include "pico/multicore.h"
 #include "pico/stdlib.h"
 
 // Size of a monospaced character
@@ -32,6 +31,9 @@ static bool wrap = true;
 static TermChar charAtCursor = {0};
 /// @brief BLACK = transparent, other than that color does not matter.
 static TermChar cursorTexture = {0};
+
+static char fgColor = WHITE;
+static char bgColor = BLACK;
 
 static char colorAt(int x, int y) {
     if (x >= SCREEN_WIDTH) return 0;
@@ -182,6 +184,14 @@ void term_clear_from_end(uint32_t row, uint32_t col) {
         fillRect(col * CHAR_WIDTH, row * CHAR_HEIGHT, SCREEN_WIDTH - col * CHAR_WIDTH, CHAR_HEIGHT, BLACK); // TODO: DMA?
 }
 
+inline void term_fg_color(char color) {
+    fgColor = color;
+}
+
+inline void term_bg_color(char color) {
+    bgColor = color;
+}
+
 void term_process(char input) {
     if (input == '\033') { // ESC
 
@@ -214,7 +224,7 @@ void term_process(char input) {
 
     }
     else { // printable characters
-        drawChar(termCol * CHAR_WIDTH, termRow * CHAR_HEIGHT, input, WHITE, BLACK, 1);
+        drawChar(termCol * CHAR_WIDTH, termRow * CHAR_HEIGHT, input, fgColor, bgColor, 1);
         advance();
         drawCursor();
     }
